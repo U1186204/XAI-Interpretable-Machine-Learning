@@ -1,0 +1,228 @@
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cells [] September 1th, 2025 @ 3:49PM 
+with the following prompt:
+
+Help me build the EDA Cheart for my Linear Regression Model assumptions 
+Check Linearity with scatter plots of predictors vs. churn, component-plus-residual plots (which you've already implemented), and Ramsey's RESET test
+Check Independence of Observations with Durbin-Watson test (your data doesn't appear time-series based, but worth checking)
+Check Homoscedasticity with residual vs. predicted value plots, Breusch-Pagan test, and scale-location plots
+Check Normality of Residuals with Q-Q plots, histograms of residuals, and Shapiro-Wilk test
+Check for Multicollinearity with correlation matrix (particularly between tenure, MonthlyCharges, and TotalCharges) and Variance Inflation Factor (VIF)
+Check for Influential Outliers with Cook's distance and leverage plots (especially for high monthly/total charges)
+
+<MY CODE SO FAR>
+# AIPI 590 - XAI | Assignment 2 - Interpretable ML
+### Description
+### Christian Moreira
+
+#### Include the button below. Change the link to the location in your github repository:
+#### Example: https://colab.research.google.com/github/yourGHName/yourREPOName/blob/yourBranchName/yourFileName.ipynb
+
+
+[![Open In Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/U1186204/XAI-Interpretable-Machine-Learning/blob/main/Interpretable_ML_Chris.ipynb)
+# Install Packages
+# Load Packages
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LinearRegression, Ridge, Lasso
+from sklearn.metrics import mean_squared_error, r2_score
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+from statsmodels.graphics.regressionplots import plot_ccpr
+from statsmodels.stats.diagnostic import linear_reset
+import kagglehub
+from kagglehub import KaggleDatasetAdapter
+# Data Load
+**The Churn dataset used in this assignment is derived from Kaggle and can be found [HERE](https://www.kaggle.com/datasets/blastchar/telco-customer-churn/data)**
+# Set the path to the main CSV file (hardcoded, since listing isn't supported)
+file_path = "WA_Fn-UseC_-Telco-Customer-Churn.csv"
+
+df = kagglehub.load_dataset(
+    KaggleDatasetAdapter.PANDAS,
+    "blastchar/telco-customer-churn",
+    file_path
+)
+# Task 1
+Exploratory Data Analysis to check Assumptions: Perform an exploratory analysis of the dataset to understand the relationships between different features and the target variable (churn). Use appropriate visualizations and statistical methods to determine whether assumptions about linear, logistic, and GAM models are met. 
+### Data Dimensions, Variable Types, and Check for Missing Values
+print("Data Structure")
+print("-----------------")
+print(f"Dimensions: {df.shape}")
+print(f"Data Types:\n{df.dtypes}")
+print(f"Missing Values:\n {df.isnull().sum()}")
+### Interpretation
+- Dataset has a total of 7043 observations & 21 variables
+- With the exception of MonthlyCharges, tenure and senior citizen - most other variables seem categorical, including the explained variable **Churn**
+- No missing fields have been reported suggesting there is not a need for imputations or deletion of observations
+### Central tendencies for numerical variables, measures of dispersion for numerical variables, distributions
+print("\n Descriptive Statistics for Numerical Variables")
+print("------------------")
+numeric_columns = df.select_dtypes(include=np.number).columns
+print("Central Tendency Measures:")
+print(df[numeric_columns].describe().loc[['mean', '50%']])
+print("\n Dispersion Measures:")
+print(df[numeric_columns].describe().loc[['std', 'min', 'max']])
+
+# Distribution Normality Check
+print("\n Distribution Measures:")
+print(df[numeric_columns].skew())
+print(df[numeric_columns].kurt())
+### Interpretation
+**Descriptive Statistics**
+- The variable SeniorCitizen appears to be a binary variable indicating whether an individual is a senior or not. 
+- Means and medians provide insights into the central location of the data. The mean tenure is ~32 months and the median 29 months. The mean monthly charges are ~$64 and median ~$70. 
+
+**Dispersion Measures**
+- The skewness value for tenure of ~.23, which is positive and close to 0 indicates a slight right skew. Similarly, the skewness value of ~-.22 for monthly charges, while close to 0 and negative, suggests a slight left skew. 
+- The  kurtosis value for tenure and monthly charges are -1.38 and -1.25 respectively; These indicate values are spread out and with thin tails, which mean distributions for tenure months and monthly charges in $ should be relatively uniform.  
+### Checking for Overall Data Quality: Duplicated values & Outliers 
+# Data Quanlity Checks
+print("\n Data Quality")
+print("------------------")
+print(f"Duplicated Rows: {df.duplicated().sum()}")
+print("Checking for Inconsistent Values:")
+print(df.apply(lambda x: x.value_counts().index[0]).to_frame(name='Most Frequent Value'))
+### Interpretation
+**Data Quality Assessment**
+- The dataset does not exhibit any inconsistencies: there are no duplicated values or nonsensical values in the dataset. 
+### Data Encoding for Model EDA
+- Given a moajority of the dataset is Categorical we will do come encodings in order to visualize the relationship between explanatory variables and explained variable(Churn)
+# Only Tenure and MonthlyCharges are numeric
+numeric_columns = ['tenure', 'MonthlyCharges', 'TotalCharges']
+df['TotalCharges'] = df['TotalCharges'].replace(' ', 0)
+df[numeric_columns] = df[numeric_columns].astype(float)
+
+# Cleaning Internet and Phone Services and Encoding them to Binary
+internet_dependent_services = ['OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 
+                              'TechSupport', 'StreamingTV', 'StreamingMovies']
+for col in internet_dependent_services:
+    df[col] = df[col].replace({'No internet service': 'No'})
+    df[col] = df[col].map({'Yes': 1, 'No': 0})
+
+df['MultipleLines'] = df['MultipleLines'].replace({'No phone service': 'No'})
+df['MultipleLines'] = df['MultipleLines'].map({'Yes': 1, 'No': 0})
+
+# Encoding all other Binary Variables to 0 and 1, Including Churn
+df['gender'] = df['gender'].map({'Female': 0, 'Male': 1})
+df['Partner'] = df['Partner'].map({'No': 0, 'Yes': 1})
+df['Dependents'] = df['Dependents'].map({'No': 0, 'Yes': 1})
+df['PhoneService'] = df['PhoneService'].map({'No': 0, 'Yes': 1})
+df['PaperlessBilling'] = df['PaperlessBilling'].map({'No': 0, 'Yes': 1})
+df['Churn'] = df['Churn'].map({'No': 0, 'Yes': 1})
+
+# Encoding Categorical Variables with more than 2 categories using One-Hot Encoding
+df['InternetService'] = df['InternetService'].map({'DSL': 1, 'Fiber optic': 2, 'No': 0})
+df['Contract'] = df['Contract'].map({'Month-to-month': 0, 'One year': 1, 'Two year': 2})
+df['PaymentMethod'] = df['PaymentMethod'].map({'Electronic check': 0, 'Mailed check': 1, 
+                                               'Bank transfer (automatic)': 2, 'Credit card (automatic)': 3})
+
+# Print Only the NUMBER of unique values in each column
+print("\n Unique Values per Column")
+print("------------------")
+print(df.nunique())
+# Only Tenure and MonthlyCharges are numeric
+numeric_columns = ['tenure', 'MonthlyCharges', 'TotalCharges']
+df['TotalCharges'] = df['TotalCharges'].replace(' ', 0)
+df[numeric_columns] = df[numeric_columns].astype(float)
+
+# Cleaning Internet and Phone Services and Encoding them to Binary
+internet_dependent_services = ['OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 
+                              'TechSupport', 'StreamingTV', 'StreamingMovies']
+for col in internet_dependent_services:
+    df[col] = df[col].replace({'No internet service': 'No'})
+    df[col] = df[col].map({'Yes': 1, 'No': 0})
+
+df['MultipleLines'] = df['MultipleLines'].replace({'No phone service': 'No'})
+df['MultipleLines'] = df['MultipleLines'].map({'Yes': 1, 'No': 0})
+
+# Encoding all other Binary Variables to 0 and 1, Including Churn
+df['gender'] = df['gender'].map({'Female': 0, 'Male': 1})
+df['Partner'] = df['Partner'].map({'No': 0, 'Yes': 1})
+df['Dependents'] = df['Dependents'].map({'No': 0, 'Yes': 1})
+df['PhoneService'] = df['PhoneService'].map({'No': 0, 'Yes': 1})
+df['PaperlessBilling'] = df['PaperlessBilling'].map({'No': 0, 'Yes': 1})
+df['Churn'] = df['Churn'].map({'No': 0, 'Yes': 1})
+
+# Encoding Categorical Variables with more than 2 categories using One-Hot Encoding
+df['InternetService'] = df['InternetService'].map({'DSL': 1, 'Fiber optic': 2, 'No': 0})
+df['Contract'] = df['Contract'].map({'Month-to-month': 0, 'One year': 1, 'Two year': 2})
+df['PaymentMethod'] = df['PaymentMethod'].map({'Electronic check': 0, 'Mailed check': 1, 
+                                               'Bank transfer (automatic)': 2, 'Credit card (automatic)': 3})
+
+# Print Only the NUMBER of unique values in each column
+print("\n Unique Values per Column")
+print("------------------")
+print(df.nunique())
+### Linearity Check
+
+SUMMARY OF DATA>
+
+ Unique Values per Column
+------------------
+customerID          7043
+gender                 2
+SeniorCitizen          2
+Partner                2
+Dependents             2
+tenure                73
+PhoneService           2
+MultipleLines          2
+InternetService        3
+OnlineSecurity         2
+OnlineBackup           2
+DeviceProtection       2
+TechSupport            2
+StreamingTV            2
+StreamingMovies        2
+Contract               3
+PaperlessBilling       2
+PaymentMethod          4
+MonthlyCharges      1585
+TotalCharges        6531
+Churn                  2
+dtype: int64
+
+
+
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
+Used Claude Sonnet 3.7 Model for Cell X on Notebook Cell [] September 1th, 2025 @ 3:49PM 
+with the following prompt
