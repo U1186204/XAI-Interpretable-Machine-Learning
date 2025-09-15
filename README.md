@@ -1,3 +1,9 @@
+[![Repo](https://img.shields.io/badge/GitHub-XAI--Interpretable--Machine--Learning-blue?logo=github)](https://github.com/U1186204/XAI-Interpretable-Machine-Learning)
+[![Open In Collab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/U1186204/XAI-Interpretable-Machine-Learning/blob/main/Interpretable_ML_Chris.ipynb)
+[![CI](https://github.com/U1186204/XAI-Interpretable-Machine-Learning/actions/workflows/ci.yml/badge.svg)](https://github.com/U1186204/XAI-Interpretable-Machine-Learning/actions/workflows/ci.yml)
+[![CI](https://github.com/U1186204/XAI-Interpretable-Machine-Learning/actions/workflows/ci.yml/badge.svg)](https://github.com/U1186204/XAI-Interpretable-Machine-Learning/actions/workflows/ci.yml)
+
+
 # Interpretable Machine Learning for Churn Prediction
 
 ## Project Overview
